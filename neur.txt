@@ -1,0 +1,1719 @@
+// TurnBasedSimpleLifeSim.cpp : Ten plik zawiera funkcję „main”. W nim rozpoczyna się i kończy wykonywanie programu.
+//
+
+#include <iostream>
+#include <ctime>
+#include <cstdlib>
+#include <cstdio>
+#include <conio.h>
+#include <windows.h>
+#include <math.h>
+
+HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+
+void changeColor(int kolor)
+{
+    SetConsoleTextAttribute(hOut, kolor);
+}
+
+/*
+class NeuralNet;
+class Simulation;
+
+class Neuron
+{
+    friend NeuralNet;
+
+public:
+    float rawOutput;
+    float output;
+    float input;
+
+    float bias;
+
+    float* weight;
+    Neuron* neuronIn;
+    Neuron* neuronOut;
+
+    int dendriteInTabSize;
+    int dendriteOutTabSize;
+
+public:
+    Neuron()
+    {
+        rawOutput = 0;//input-bias
+        input = 0;
+        output = 0;
+        bias = 0;
+    }
+
+    float LReLU(float inputVar)
+    {
+        if (input - bias < 0)
+            return inputVar * 0.001;
+        else if (inputVar - bias >= 0 && inputVar - bias < 1)
+            return inputVar;
+        else if (inputVar - bias >= 1)
+            return 0.999+inputVar *0.001;
+    }
+    // dLReLU/db
+    float biasDerevLReLU()
+    {
+        if (rawOutput < 0)
+            return 0.001;
+        else if (rawOutput >= 0)
+            return 1;
+        else if (rawOutput >= 1)
+            return 0.001;
+    }
+    // dLReLU/dw
+    float weightDerevLReLU(int var)
+    {
+        float x = neuronIn[var].output;
+        if (rawOutput < 0)
+            return x * 0.001;
+        else if (rawOutput >= 0)
+            return x * 1;
+        else if (rawOutput >= 1)
+            return x * 0.001;
+    }
+    // dLReLU/dn
+    float inputNeuronDerevLReLU(int var)
+    {
+        if (rawOutput < 0)
+            return weight[var] * 0.001;
+        else if (rawOutput >= 0)
+            return weight[var] * 1;
+        else if (rawOutput >= 1)
+            return weight[var] * 0.001;
+    }
+
+    void randomize()
+    {
+        srand(time(NULL));
+        for (int i = 0; i < dendriteInTabSize; i++)
+            weight[i] = rand()%10;
+
+        bias = rand()%100*(-1);
+        //std::cout << bias<< std::endl;
+        //_getch();
+    }
+    void calculate()
+    {
+        input = 0;
+
+        for (int i = 0; i < dendriteInTabSize; i++)
+            input += neuronIn[i].output * weight[i];
+        rawOutput = input - bias;
+        output=LReLU(input);
+
+        //std::cout << "bias: " << bias<< std::endl;
+        //for (int i = 0; i < dendriteInTabSize; i++)
+            //std::cout << i + 1 << ".weight " << weight[i] << "; neuron " << neuronIn[i].output << std::endl;
+
+        //std::cout<<std::endl;
+
+        //_getch();
+    }
+    void addToInput(float var)
+    {
+        input = input + var;
+    }
+
+    void addNeuronInTab (Neuron* neuronVar)
+    {
+        neuronIn = neuronVar;
+    }
+
+    void addNeuronOutTab(Neuron* neuronVar)
+    {
+        neuronOut = neuronVar;
+    }
+
+};
+
+class NeuralNet
+{
+    /// <summary>
+    /// naprawić connect layers(memory leak)
+    /// </summary>
+    friend Neuron;
+    friend Simulation;
+public:
+    float learningRate;//0.001
+
+    static const int hidLayNum=3;
+    static const int hidLaySize=10;
+    static const int FoW = 4;
+
+    static const int inLayerSize = (FoW * 2 + 1) * (FoW * 2 + 1) + 2;//+2 oznacza glod i pragnienie
+
+public:
+    Neuron inputLayer[inLayerSize];
+    Neuron hiddenLayer[hidLayNum][hidLaySize];
+    Neuron outputLayer[5];
+public:
+    NeuralNet()
+    {
+        learningRate = 0.001;//!!!!!!!!!!!!!!!!!!!
+
+        connectLayers(inputLayer, inLayerSize, hiddenLayer[0], hidLaySize);
+        for (int i = 0; i <= hidLayNum - 2; i++)
+        {
+            connectLayers(hiddenLayer[i], hidLaySize, hiddenLayer[i+1], hidLaySize);
+        }
+        connectLayers(hiddenLayer[hidLayNum-1], hidLaySize, outputLayer, 5);
+
+        for (int j = 0; j < hidLayNum; j++)
+        {
+            for (int i = 0; i < hidLaySize; i++)
+                hiddenLayer[j][i].randomize();
+        }
+
+        for (int i = 0; i < 5; i++)
+            outputLayer[i].randomize();
+    }
+
+    void learnByThisExample(float* inputLayerVar, float* outputLayerVar)
+    {
+
+        //kalkulowanie wyniku sieci
+        for (int i = 0; i < inLayerSize; i++)
+            inputLayer[i].output = inputLayerVar[i];
+
+        for (int j = 0; j < hidLayNum; j++)
+        {
+            for (int i = 0; i < hidLaySize; i++)
+                hiddenLayer[j][i].calculate();
+        }
+
+        for (int i = 0; i < 5; i++)
+            outputLayer[i].calculate();
+        //wyswietlenie bledu
+        float bladMetody = 0;
+
+        for (int i = 0; i < 5; i++)
+            bladMetody+=(outputLayer[i].output - outputLayerVar[i])* (outputLayer[i].output - outputLayerVar[i]);
+
+        bladMetody = bladMetody / 5;
+       // std::cout << "Blad metody: " << bladMetody << std::endl;
+
+        //uczenie sieci
+        float biasChange = 0;
+        float weightChange = 0;
+        float dervChainn = 1;
+
+        for (int j = 0; j < hidLayNum; j++)
+        {
+            for (int i = 0; i < hidLaySize; i++)
+            {
+                for (int k = 0; k < 5; k++)
+                {
+                    biasChange += hiddenLayer[j][i].biasDerevLReLU()*dervChain(&outputLayer[k], &hiddenLayer[j][i], 1)* (outputLayerVar[k]-outputLayer[k].output)* 2/5 * learningRate;
+                }
+                hiddenLayer[j][i].bias -=biasChange;
+                biasChange = 0;
+
+                for (int p = 0; p < hiddenLayer[j][i].dendriteInTabSize; p++)
+                {
+                    //std::cout <<p+1<< "-> wDR:" << hiddenLayer[j][i].weightDerevLReLU(p)<<std::endl ;
+
+                    for (int k = 0; k < 5; k++)
+                    {
+                        weightChange+=hiddenLayer[j][i].weightDerevLReLU(p) * dervChain(&outputLayer[k], &hiddenLayer[j][i], 1) * (outputLayerVar[k] - outputLayer[k].output) * 2 / 5 * learningRate;
+                        //std::cout <<"["<<p+1<<","<<k+1<<"]"<< "dC:" << dervChain(&outputLayer[k], &hiddenLayer[j][i], 1);
+                        //std::cout << "wDC:" << hiddenLayer[j][i].weightDerevLReLU(p) * dervChain(&outputLayer[k], &hiddenLayer[j][i], 1) * (outputLayerVar[k] - outputLayer[k].output) * 2 * learningRate / 5 << std::endl;
+                    }
+
+                    hiddenLayer[j][i].weight[p] += weightChange;
+                    weightChange = 0;
+
+                }
+            }
+        }
+
+        for (int k = 0; k < 5; k++)
+        {
+            outputLayer[k].bias -=outputLayer[k].biasDerevLReLU()* (outputLayerVar[k] - outputLayer[k].output) * 2 / 5 * learningRate;
+            //std::cout <<k<<". output bias:"<< outputLayer[k].biasDerevLReLU() * (outputLayerVar[k] - outputLayer[k].output) * 2 / 5 * learningRate << std::endl;
+            for (int p = 0; p < outputLayer[k].dendriteInTabSize; p++)
+            {
+                outputLayer[k].weight[p] +=outputLayer[k].weightDerevLReLU(p) * (outputLayerVar[k] - outputLayer[k].output) * 2 / 5 * learningRate;
+            }
+        }
+    }
+private:
+    float dervChain(Neuron* start,Neuron* stop, float var)
+        {
+            float temp=0;
+            for (int i = 0; i < start->dendriteInTabSize; i++)
+            {
+                if (&(start->neuronIn[i]) == stop)
+                    return var * start->inputNeuronDerevLReLU(i);              
+            }
+            for (int i = 0; i < start->dendriteInTabSize; i++)
+            {
+                temp += dervChain(&(start->neuronIn[i]), stop, start->inputNeuronDerevLReLU(i));
+            }
+
+            return temp;
+        }
+    static const void  xd()
+    {
+
+    }
+    void connectLayers(Neuron* layerIn,int sizeIn, Neuron* layerOut, int sizeOut)
+    {
+        //ogarnianie layerIn
+        for (int i = 0; i < sizeIn; i++)
+        {
+            layerIn[i].addNeuronOutTab(layerOut);
+            layerIn[i].dendriteOutTabSize = sizeOut;
+            
+
+        }
+
+        for (int i = 0; i < sizeOut; i++)
+        {
+            layerOut[i].addNeuronInTab(layerIn);
+            layerOut[i].dendriteInTabSize = sizeIn;
+            layerOut[i].weight = new float[sizeIn];
+            for (int j = 0; j < sizeIn; j++)
+            {
+            layerOut[i].weight[j] = 1;
+            }
+        }
+
+
+    }
+
+
+
+};
+
+class Map
+{
+    friend class Player;
+
+private:
+    char map[22][22];
+    int color[22][22];
+public:
+    Map()
+    {
+        for (int i = 0; i < 22; i++)
+        {
+            map[i][0] = '=';
+            map[i][21] = '=';
+            map[0][i] = '=';
+            map[21][i] = '=';
+        }
+        for (int i = 1; i < 21; i++)
+        {
+            for (int j = 1; j < 21; j++)
+            {
+                map[i][j] = '.';
+            }
+        }
+
+        for (int i = 0; i < 22; i++)
+        {
+            for (int j = 0; j < 22; j++)
+            {
+                color[i][j] = 15;
+            }
+        }
+
+        map[11][11] = '&';
+
+        map[14][11] = 'W';
+        map[16][14] = 'F';
+
+    }
+
+    void view()
+    {
+        system("cls");
+
+        for (int i = 0; i < 22; i++)
+        {
+            for (int j = 0; j < 22; j++)
+            {
+                std::cout << map[i][j];
+            }
+            std::cout << std::endl;
+        }
+    }
+
+};
+
+class Player 
+{
+    const static int FoWSize = 4;
+    const static int consumeIncrese = 5;
+    const static int moveDecrese = 1;
+    const static int maxWater = 100;
+    const static int maxHunger = 100;
+private:
+    int x;
+    int y;
+    int waterBar;
+    int hungerBar;
+    char FoW[FoWSize*2+1][FoWSize*2+1];
+    Map* map;
+
+public:
+    Player()
+    {
+        x = 11;
+        y = 11;
+        waterBar = maxWater;
+        hungerBar = maxHunger;
+    }
+
+    Player(Map* mapVar)
+    {
+        map = mapVar;
+        x = 11;
+        y = 11;
+        waterBar = maxWater;
+        hungerBar = maxHunger;
+        updateFoW();
+    }
+
+    void updateFoW()
+    {
+        int i2=0;
+        int j2=0;
+        for (int i=x- FoWSize; i <= x+ FoWSize;i++)
+        {
+            for (int j=y- FoWSize; j <= y+ FoWSize; j++)
+            {
+                if (i >= 0 && i < 22 && j >= 0 && j < 22)
+                {
+                    FoW[i2][j2] = map->map[i][j];
+                }
+                else
+                {
+                    FoW[i2][j2] = '=';
+                }
+                j2++;
+            }
+            j2 = 0;
+            i2++;
+        }
+    }
+
+    void viewFoW()
+    {
+        for (int i = 0; i < FoWSize * 2 + 1; i++)
+        {
+            for (int j = 0; j < FoWSize * 2 + 1; j++)
+            {
+                std::cout << FoW[i][j];
+            }
+            std::cout << std::endl;
+        }
+
+    }
+
+    void doNothing()
+    {
+        hungerBar--;
+        waterBar--;
+    }
+
+    void moveUp()
+    {
+        if (map->map[x - 1][y] == '.')
+        {
+            map->map[x - 1][y] = '&';
+
+            map->map[x][y] = '.';
+
+            x--;
+            updateFoW();
+            hungerBar--;
+            waterBar--;
+        }
+    }
+
+    void moveDown()
+    {
+        if (map->map[x + 1][y] == '.')
+        {
+            map->map[x + 1][y] = '&';
+
+            map->map[x][y] = '.';
+
+            x++;
+            updateFoW();
+        }
+        hungerBar--;
+        waterBar--;
+    }
+
+    void moveLeft()
+    {
+        if (map->map[x][y - 1] == '.')
+        {
+            map->map[x][y - 1] = '&';
+
+            map->map[x][y] = '.';
+
+            y--;
+            updateFoW();
+        }
+        hungerBar--;
+        waterBar--;
+    }
+
+    void moveRight()
+    {
+        if (map->map[x][y + 1] == '.')
+        {
+            map->map[x][y + 1] = '&';
+
+            map->map[x][y] = '.';
+
+            y++;
+            updateFoW();
+        }
+        hungerBar--;
+        waterBar--;
+    }
+
+    void consume()
+    {
+        for (int i = FoWSize - 1 ; i <= FoWSize + 1; i++)
+        {
+            for (int j = FoWSize - 1; j <= FoWSize + 1; j++)
+            {
+                if (FoW[i][j] == 'W')
+                {
+                    waterBar += consumeIncrese;
+                    if (waterBar > maxWater)
+                    {
+                        waterBar = maxWater+1;
+                    }
+                }
+                if (FoW[i][j] == 'F')
+                {
+                    hungerBar += consumeIncrese;
+                    if (hungerBar>maxHunger)
+                    {
+                        hungerBar = maxHunger+1;
+                    }
+                }
+
+            }
+        }
+        hungerBar--;
+        waterBar--;
+    }
+
+    void viewStats()
+    {
+        std::cout<< "Water Level: " << waterBar << " Food Level: " << hungerBar<<std::endl;
+    }
+};
+
+class Simulation {
+    friend NeuralNet;
+public:
+    Map map;
+    Player player = *(new Player(&map));
+    NeuralNet neuralNet;
+
+
+public:
+    Simulation(Map mapVar)
+    {
+        map = mapVar;
+    }
+    void playManualy()
+    {
+        char choice;
+        while (true)
+        {
+            map.view();
+            player.viewStats();
+            player.viewFoW();
+
+            choice = _getch();
+
+            switch (choice)
+            {
+            case'w':
+                player.moveUp();
+                break;
+            case's':
+                player.moveDown();
+                break;
+            case'a':
+                player.moveLeft();
+                break;
+            case'd':
+                player.moveRight();
+                break;
+            case' ':
+                player.consume();
+                break;
+            default:
+                player.doNothing();
+                break;
+
+            }
+        }
+    }
+    //void saveRun();
+    //void playSimulation();
+    //void startLearing();
+
+
+};
+
+int main()
+{
+ //HISTORIA:
+ //. -puste pole
+// = -sciana
+// & - gracz
+// F - jedzenie
+// W - woda
+
+    Map map;
+
+    Simulation simulation(map);
+    //simulation.
+    float exampleOut[5];
+    for (int i = 0; i < 5; i++)
+    {
+        exampleOut[i] = 0;
+    }
+    exampleOut[2] = 1;
+
+    float exampleIn[83];
+    for (int i = 0; i < 83; i++)
+    {
+        exampleIn[i] = 0;
+    }
+    exampleIn[2] = 1;
+
+    float bladMetody = 0;
+    simulation.neuralNet.learnByThisExample(exampleIn, exampleOut);
+
+    //stale do wyswietlania bledu
+    const int wyswietlCoIle=100;
+    const int coJakiProcent = 100;
+    const int stalaModulo = wyswietlCoIle * coJakiProcent /100;
+
+
+    while (true)
+    {
+        for (int i = 0; i < 5; i++)
+            bladMetody += (simulation.neuralNet.outputLayer[i].output - exampleOut[i]) * (simulation.neuralNet.outputLayer[i].output - exampleOut[i]);
+        bladMetody = bladMetody / 5;
+        std::cout << "Blad metody: " << bladMetody << std::endl;
+
+        bladMetody = 0;
+
+        for (int i = 0; i < wyswietlCoIle; i++)
+        {
+            simulation.neuralNet.learnByThisExample(exampleIn, exampleOut);
+            if (i % stalaModulo == 0)
+            {
+                std::cout <<(float)(i*100/ wyswietlCoIle) << "%"<<std::endl;
+            }
+        }
+        std::cout << "100%" << std::endl;
+        //_getch();
+
+    }
+
+
+
+
+    //simulation.playManualy();
+}
+*/
+
+class Function
+{
+public:
+    virtual float calculate(float floatVar)
+    {
+        return floatVar;
+    }
+    virtual float calculateDerevative(float floatVar)
+    {
+        return 1;
+    }
+   
+};
+
+class Sigmoid:public Function
+{
+private :
+    const float e = 2.71828182846;
+
+public:
+    float calculate(float floatVar)
+    {
+        return 1 / (1 + pow(e,(-1) * floatVar));
+    }
+    float calculateDerevative(float floatVar)
+    {
+        return 1 / (2 + pow(e, (-1) * floatVar) + pow(e,floatVar));
+    }
+
+};
+
+class ReLU : public Function
+{
+public:
+    float calculate(float floatVar)
+    {
+        if (floatVar >= 0)
+            return floatVar;
+        else
+            return 0;
+    }
+    float calculateDerevative(float floatVar)
+    {
+        if (floatVar >= 0)
+            return 1;
+        else
+            return 0;
+    }
+
+};
+
+class LReLU : public Function
+{
+public:
+    float calculate(float floatVar)
+    {
+        if (floatVar >= 0)
+            return floatVar;
+        else
+            return floatVar*0.001;
+    }
+    float calculateDerevative(float floatVar)
+    {
+        if (floatVar >= 0)
+            return 1;
+        else
+            return 0.001;
+    }
+
+};
+class NeuralNet;
+class Neuron
+{
+    friend NeuralNet;
+    //friend NeuralNet;
+private:
+    Neuron* neuronIn;
+    float* weight;
+    unsigned int inputSize_t;
+
+    float input;
+    float bias;
+public:
+    Function* activationFunction;
+
+    float output;
+
+
+    //derevatives
+    //float* dWeight;
+    //float* dNeuron;
+    //float dBias;
+public:
+    Neuron()
+    {
+        input = 0;
+        output = 0;
+        bias = 0;
+        inputSize_t = 0;
+
+        weight = nullptr;
+        neuronIn = nullptr;
+        activationFunction = new Sigmoid;
+    }
+    Neuron(Neuron* neuronIn,int inputSize_t)
+    {
+        input = 0;
+        output = 0;
+        bias = 0;
+        this->neuronIn = neuronIn;
+        this->inputSize_t = inputSize_t;
+        this->neuronIn = neuronIn;
+        weight = new float[inputSize_t];
+        for (int i = 0; i < inputSize_t; i++)
+        {
+            weight[i] = 1;
+        }
+
+        activationFunction = new Sigmoid;
+    }
+    Neuron(Neuron* neuronIn, int inputSize_t,Function* activationFunction)
+    {
+        input = 0;
+        output = 0;
+        bias = 0;
+        this->neuronIn = neuronIn;
+        this->inputSize_t = inputSize_t;
+        this->neuronIn = neuronIn;
+        weight = new float[inputSize_t];
+        for (int i = 0; i < inputSize_t; i++)
+        {
+            weight[i] = 1;
+        }
+
+        this->activationFunction = activationFunction;
+    }
+    Neuron(Neuron* neuronIn,float *weight,int inputSize_t)
+    {
+        input = 0;
+        output = 0;
+        bias = 0;
+        this->neuronIn = neuronIn;
+        this->weight = weight;
+        this->inputSize_t = inputSize_t;
+
+        activationFunction = new Sigmoid;
+    }
+
+    void addToInput(float floatVar)
+    {
+        input += floatVar;
+    }
+    long double getBias()
+    {
+        return bias;
+    }
+    long double getInput()
+    {
+        return input;
+    }
+    long double getWeight(unsigned int variable)
+    {
+        return weight[variable];
+    }
+    //sets input to zero then adds SUM of neuronIn[i]*weight[i]
+    void lern(long double* weightDerev,unsigned int weightDerevSize_t, long double biasDerev)
+    {
+        for(int i=0;i<weightDerevSize_t;i++)
+        weight[i] += weightDerev[i];
+        bias += biasDerev;
+    }
+    //sets input to zero then adds SUM of neuronIn[i]*weight[i]
+    void calculateInput()
+    {
+        input = 0;
+        for(int i=0;i<inputSize_t;i++)
+        this->addToInput(neuronIn[i].output*weight[i]);
+    }
+    void calculateOutput()
+    {
+        output = activationFunction->calculate(input-bias);
+    }
+    void calculate()
+    {
+        calculateInput();
+        calculateOutput();
+    }
+    void addNeuronInTab(Neuron* neuronIn,unsigned int inputSize_t)
+    {
+        delete this->weight;
+        this->weight = new float[inputSize_t];
+        for (int i = 0; i < inputSize_t; i++)
+        {
+            weight[i] = 1;
+        }
+        this->inputSize_t=inputSize_t;
+        delete this->neuronIn;
+        this->neuronIn = neuronIn;
+    }
+
+};
+
+class NeuralNet
+{
+private:
+    Neuron* inputLayer;
+    unsigned int inputLayerSize_t;
+
+    Neuron** hiddenLayers;
+    unsigned int hiddenLayersNum;
+    unsigned int* hiddenLayersSizes_t;
+
+    Neuron* outputLayer;
+    unsigned int outputLayerSize_t;
+
+    //derevatives in respect to cost function(multiplied by -1) based on neuron inputs
+    //long double* inputLayerDerev;
+    long double** hiddenLayersDerev;
+    long double* outputLayerDerev;
+
+private:
+    void connectLayers(Neuron* prevLayer,unsigned int prevLayerSize_t,Neuron* nextLayer,unsigned int nextLayerSize_t)
+    {
+        for (int i = 0; i < nextLayerSize_t; i++)
+        {
+            nextLayer[i].addNeuronInTab(prevLayer, prevLayerSize_t);
+        }
+    }
+
+    void calculateDerev(long double *desiredOutput)
+    {
+        //Cost Function= SUM(Nk-Yk)^2//Derev=2Nk-2Yk=2(Nk-Yk)
+        for (int i = 0; i < outputLayerSize_t; i++)
+            outputLayerDerev[i] = 2 * (desiredOutput[i] - outputLayer[i].output) * outputLayer[i].activationFunction->calculateDerevative(outputLayer[i].getInput()- outputLayer[i].getBias());//we multiply it by -1 for future gradient calculations 
+
+            if (hiddenLayersNum >= 1)
+            {
+                for (int i = 0; i < hiddenLayersSizes_t[hiddenLayersNum - 1]; i++)
+                {
+                    hiddenLayersDerev[hiddenLayersNum - 1][i] = 0;
+                    for (int j = 0; j < outputLayerSize_t; j++)
+                        hiddenLayersDerev[hiddenLayersNum - 1][i] += outputLayerDerev[j] * outputLayer[j].getWeight(j);
+                    hiddenLayersDerev[hiddenLayersNum - 1][i]*= hiddenLayers[hiddenLayersNum - 1][i].activationFunction->calculateDerevative(hiddenLayers[hiddenLayersNum - 1][i].getInput() - hiddenLayers[hiddenLayersNum - 1][i].getBias());
+                }
+            }
+
+            for (int layer = hiddenLayersNum -2; layer >=0; layer--)
+                for (int i = 0; i < hiddenLayersSizes_t[layer]; i++)
+                {
+                    hiddenLayersDerev[layer][i] = 0;
+                    for (int j = 0; j < hiddenLayersSizes_t[layer + 1]; j++)
+                        hiddenLayersDerev[layer][i] += hiddenLayersDerev[layer + 1][j] * hiddenLayers[layer + 1][j].getWeight(j);
+                    hiddenLayersDerev[layer][i]* hiddenLayers[layer][i].activationFunction->calculateDerevative(hiddenLayers[layer][i].getInput() - hiddenLayers[layer][i].getBias())* hiddenLayers[layer][i].getWeight(i);
+                }
+    }
+
+    void calculateNeurons()
+    {
+        for (int i = 0; i < hiddenLayersNum; i++)
+            for (int j = 0; j < hiddenLayersSizes_t[i]; j++)
+            {
+                hiddenLayers[i][j].calculate();
+            }
+        for (int i = 0; i < outputLayerSize_t; i++)
+            outputLayer[i].calculate();
+    }
+public:
+    NeuralNet()
+    {
+        unsigned int* ptVar;
+        ptVar = new unsigned int[1];
+        ptVar[0] = 1;
+
+        NeuralNet(2, 1, ptVar, 1);
+    }
+
+    NeuralNet( unsigned int inputLayerSize_t, unsigned int hiddenLayersNum, unsigned int* hiddenLayersSizes_t, unsigned int outputLayerSize_t)
+    {
+        //making crucial componets
+        this->inputLayerSize_t = inputLayerSize_t;
+        inputLayer = new Neuron[inputLayerSize_t];
+        //inputLayerDerev = new long double[inputLayerSize_t];
+
+        this->hiddenLayersNum = hiddenLayersNum;
+        this->hiddenLayersSizes_t = hiddenLayersSizes_t;
+        hiddenLayers = new Neuron* [hiddenLayersNum];
+        hiddenLayersDerev = new long double* [hiddenLayersNum];
+        for (int i = 0; i < hiddenLayersNum; i++)
+        {
+            hiddenLayers[i] = new Neuron[hiddenLayersSizes_t[i]];
+            hiddenLayersDerev[i] = new long double[hiddenLayersSizes_t[i]];
+        }
+
+        this->outputLayerSize_t = outputLayerSize_t;
+        outputLayer = new Neuron[outputLayerSize_t];
+        outputLayerDerev = new long double[outputLayerSize_t];
+
+        //connecting the net
+        if (hiddenLayersNum>=1)
+            connectLayers(inputLayer, inputLayerSize_t, hiddenLayers[0], hiddenLayersSizes_t[0]);
+
+        for (int i = 1; i < hiddenLayersNum; i++)
+            connectLayers(hiddenLayers[i-1], hiddenLayersSizes_t[i-1], hiddenLayers[i], hiddenLayersSizes_t[i]);
+
+        if (hiddenLayersNum >= 1)
+            connectLayers(hiddenLayers[hiddenLayersNum - 1], hiddenLayersSizes_t[hiddenLayersNum - 1], outputLayer, outputLayerSize_t);
+        else
+            connectLayers(inputLayer, inputLayerSize_t, outputLayer, outputLayerSize_t);
+    }
+
+    NeuralNet(Neuron* inputLayer, unsigned int inputLayerSize_t,
+        Neuron** hiddenLayers, unsigned int hiddenLayersNum, unsigned int* hiddenLayersSizes_t,
+        Neuron* outputLayer, unsigned int outputLayerSize_t)
+    {
+        this->inputLayer= inputLayer;
+        this->inputLayerSize_t= inputLayerSize_t;
+        //inputLayerDerev = new long double[inputLayerSize_t];
+
+        this->hiddenLayers= hiddenLayers;
+        this->hiddenLayersNum= hiddenLayersNum;
+        this->hiddenLayersSizes_t= hiddenLayersSizes_t;
+        hiddenLayersDerev = new long double* [hiddenLayersNum];
+        for (int i = 0; i < hiddenLayersNum; i++)
+        {
+            hiddenLayers[i] = new Neuron[hiddenLayersSizes_t[i]];
+            hiddenLayersDerev[i] = new long double[hiddenLayersSizes_t[i]];
+        }
+
+        this->outputLayer= outputLayer;
+        this->outputLayerSize_t= outputLayerSize_t;
+        outputLayerDerev = new long double[outputLayerSize_t];
+
+        //connecting the net
+        if (hiddenLayersNum >= 1)
+            connectLayers(inputLayer, inputLayerSize_t, hiddenLayers[0], hiddenLayersSizes_t[0]);
+
+        for (int i = 1; i < hiddenLayersNum; i++)
+            connectLayers(hiddenLayers[i - 1], hiddenLayersSizes_t[i - 1], hiddenLayers[i], hiddenLayersSizes_t[i]);
+
+        if (hiddenLayersNum >= 1)
+            connectLayers(hiddenLayers[hiddenLayersNum - 1], hiddenLayersSizes_t[hiddenLayersNum - 1], outputLayer, outputLayerSize_t);
+        else
+            connectLayers(inputLayer, inputLayerSize_t, outputLayer, outputLayerSize_t);
+    }
+
+    void learnByExample(long double* input,long double* desiredOutput)
+    {
+        for (int i = 0; i < inputLayerSize_t; i++)
+        inputLayer[i].output = input[i];
+
+        calculateNeurons();
+        calculateDerev(desiredOutput);
+        if (hiddenLayersNum >= 1)
+        {
+            for (int i = 0; i < outputLayerSize_t; i++)
+            {
+                long double* weightChanges;
+                weightChanges = new long double[hiddenLayersSizes_t[hiddenLayersNum - 1]];
+                long double biasChange = -outputLayerDerev[i];
+                for (int j = 0; j < hiddenLayersSizes_t[hiddenLayersNum - 1]; j++)
+                {
+                    weightChanges[j] = outputLayerDerev[i] * outputLayer[i].neuronIn[j].output;
+                }
+                outputLayer[i].lern(weightChanges, hiddenLayersSizes_t[hiddenLayersNum - 1], biasChange);
+            }
+
+
+            for (int layer = hiddenLayersNum - 1; layer >= 1; layer--)
+                for (int i = 0; i < hiddenLayersSizes_t[layer]; i++)
+                {
+                    long double* weightChanges;
+                    weightChanges = new long double[hiddenLayersSizes_t[layer - 1]];
+                    long double biasChange = -hiddenLayersDerev[layer][i];
+                    for (int j = 0; j < hiddenLayersSizes_t[layer - 1]; j++)
+                    {
+                        weightChanges[j] = hiddenLayersDerev[layer][i] * hiddenLayers[layer][i].neuronIn[j].output;
+                    }
+                    hiddenLayers[layer][i].lern(weightChanges, hiddenLayersSizes_t[layer - 1], biasChange);
+                }
+                for (int i = 0; i < hiddenLayersSizes_t[0]; i++)
+                {
+                    long double* weightChanges;
+                    weightChanges = new long double[inputLayerSize_t];
+                    long double biasChange = -hiddenLayersDerev[0][i];
+                    for (int j = 0; j < inputLayerSize_t; j++)
+                    {
+                        weightChanges[j] = hiddenLayersDerev[0][i] * hiddenLayers[0][i].neuronIn[j].output;
+                    }
+                        hiddenLayers[0][i].lern(weightChanges, inputLayerSize_t, biasChange);
+                }
+        }
+        else
+        {
+            for (int i = 0; i < outputLayerSize_t; i++)
+            {
+                long double* weightChanges;
+                weightChanges = new long double[inputLayerSize_t];
+                long double biasChange = -outputLayerDerev[i];
+                for (int j = 0; j < inputLayerSize_t; j++)
+                {
+                    weightChanges[j] = outputLayerDerev[i] * outputLayer[i].neuronIn[j].output;
+                }
+                outputLayer[i].lern(weightChanges, inputLayerSize_t, biasChange);
+            }
+        }
+
+    }
+
+    void viewCostFunctionError(long double* input,long double* desiredOutput)
+    {
+        long double error;
+        long double overallError=0;
+        calculateNeurons();
+        for (int i = 0; i < outputLayerSize_t; i++)
+        {
+            error = (outputLayer[i].output - desiredOutput[i]);
+            error *= error;
+                std::cout << "[" << i + 1 << "]|Output: " << outputLayer[i].output << " |Desired:" << desiredOutput[i] << " |Error: " << error << "|" << std::endl;
+                overallError += error;
+        }
+        overallError=sqrt(overallError / outputLayerSize_t);
+        std::cout << std::endl << "Overall Error: "<<overallError << std::endl << std::endl;
+        _getch();
+    }
+
+    long double costFunctionError(long double* input, long double* desiredOutput)
+    {
+        long double error;
+        long double overallError = 0;
+        calculateNeurons();
+        for (int i = 0; i < outputLayerSize_t; i++)
+        {
+            error = (outputLayer[i].output - desiredOutput[i]);
+            error *= error;
+            overallError += error;
+        }
+        return sqrt(overallError / outputLayerSize_t);
+    }
+
+    void size()
+    {
+        std::cout << inputLayerSize_t << std::endl;
+        std::cout << outputLayerSize_t << std::endl;
+    }
+};
+
+class Map
+{
+    friend class Player;
+
+private:
+    char map[22][22];
+    int color[22][22];
+public:
+    Map()
+    {
+        for (int i = 0; i < 22; i++)
+        {
+            map[i][0] = '=';
+            map[i][21] = '=';
+            map[0][i] = '=';
+            map[21][i] = '=';
+        }
+        for (int i = 1; i < 21; i++)
+        {
+            for (int j = 1; j < 21; j++)
+            {
+                map[i][j] = '.';
+            }
+        }
+
+        for (int i = 0; i < 22; i++)
+        {
+            for (int j = 0; j < 22; j++)
+            {
+                color[i][j] = 15;
+            }
+        }
+
+        map[11][11] = '&';
+
+        map[14][11] = 'W';
+        map[16][14] = 'F';
+
+    }
+
+    void view()
+    {
+        system("cls");
+
+        for (int i = 0; i < 22; i++)
+        {
+            for (int j = 0; j < 22; j++)
+            {
+                std::cout << map[i][j];
+            }
+            std::cout << std::endl;
+        }
+    }
+
+};
+
+class Player
+{
+    const static int FoWSize = 4;
+    const static int consumeIncrese = 5;
+    const static int moveDecrese = 1;
+    const static int maxWater = 100;
+    const static int maxHunger = 100;
+private:
+    int x;
+    int y;
+    int waterBar;
+    int hungerBar;
+    char FoW[FoWSize * 2 + 1][FoWSize * 2 + 1];
+    Map* map;
+public:
+    char*** FoWData;
+    int* waterData;
+    int* hungerData;
+    int* choice;
+    int dataSize_t;//inicialization =0
+    const int maxSize = 10000;
+    
+
+public:
+    Player()
+    {
+        x = 11;
+        y = 11;
+        waterBar = maxWater;
+        hungerBar = maxHunger;
+        dataSize_t = 0;
+    }
+
+    Player(Map* mapVar)
+    {
+        map = mapVar;
+        x = 11;
+        y = 11;
+        waterBar = maxWater;
+        hungerBar = maxHunger;
+        FoWData = new char**[maxSize];
+        for (int i = 0; i < maxSize; i++)
+        {
+            FoWData[i] = new char* [FoWSize * 2 + 1];
+            for (int j = 0; j < FoWSize * 2 + 1; j++)
+                FoWData[i][j] = new char [FoWSize * 2 + 1];
+        }
+        waterData = new int[maxSize];
+        hungerData = new int[maxSize];
+        choice = new int[maxSize];
+        updateFoW();
+    }
+
+    void updateFoW()
+    {
+        int i2 = 0;
+        int j2 = 0;
+        for (int i = x - FoWSize; i <= x + FoWSize; i++)
+        {
+            for (int j = y - FoWSize; j <= y + FoWSize; j++)
+            {
+                if (i >= 0 && i < 22 && j >= 0 && j < 22)
+                {
+                    FoW[i2][j2] = map->map[i][j];
+                }
+                else
+                {
+                    FoW[i2][j2] = '=';
+                }
+                j2++;
+            }
+            j2 = 0;
+            i2++;
+        }
+    }
+
+    void viewFoW()
+    {
+        for (int i = 0; i < FoWSize * 2 + 1; i++)
+        {
+            for (int j = 0; j < FoWSize * 2 + 1; j++)
+            {
+                std::cout << FoW[i][j];
+            }
+            std::cout << std::endl;
+        }
+
+    }
+
+    void doNothing()
+    {
+        hungerBar--;
+        waterBar--;
+    }
+
+    void moveUp()
+    {
+        if (map->map[x - 1][y] == '.')
+        {
+            map->map[x - 1][y] = '&';
+
+            map->map[x][y] = '.';
+
+            x--;
+            updateFoW();
+        }
+        hungerBar--;
+        waterBar--;
+    }
+
+    void moveDown()
+    {
+        if (map->map[x + 1][y] == '.')
+        {
+            map->map[x + 1][y] = '&';
+
+            map->map[x][y] = '.';
+
+            x++;
+            updateFoW();
+        }
+        hungerBar--;
+        waterBar--;
+    }
+
+    void moveLeft()
+    {
+        if (map->map[x][y - 1] == '.')
+        {
+            map->map[x][y - 1] = '&';
+
+            map->map[x][y] = '.';
+
+            y--;
+            updateFoW();
+        }
+        hungerBar--;
+        waterBar--;
+    }
+
+    void moveRight()
+    {
+        if (map->map[x][y + 1] == '.')
+        {
+            map->map[x][y + 1] = '&';
+
+            map->map[x][y] = '.';
+
+            y++;
+            updateFoW();
+        }
+        hungerBar--;
+        waterBar--;
+    }
+
+    void consume()
+    {
+        for (int i = FoWSize - 1; i <= FoWSize + 1; i++)
+        {
+            for (int j = FoWSize - 1; j <= FoWSize + 1; j++)
+            {
+                if (FoW[i][j] == 'W')
+                {
+                    waterBar += consumeIncrese;
+                    if (waterBar > maxWater)
+                    {
+                        waterBar = maxWater + 1;
+                    }
+                }
+                if (FoW[i][j] == 'F')
+                {
+                    hungerBar += consumeIncrese;
+                    if (hungerBar > maxHunger)
+                    {
+                        hungerBar = maxHunger + 1;
+                    }
+                }
+
+            }
+        }
+        hungerBar--;
+        waterBar--;
+    }
+
+    void viewStats()
+    {
+        std::cout << "|Water Level: " << waterBar << " |Food Level: " << hungerBar <<" |"<< std::endl;
+        std::cout << dataSize_t << "/" << maxSize << std::endl;
+    }
+
+    bool saveChoice(int CHOICE)
+    {
+        if (dataSize_t != maxSize)
+        {
+            for (int x = 0; x < 2 * FoWSize + 1; x++)
+                for (int y = 0; y < 2 * FoWSize + 1; y++)
+                    FoWData[dataSize_t][x][y] = FoW[x][y];
+
+            waterData[dataSize_t] = waterBar;
+            waterData[dataSize_t] = waterBar;
+
+            choice[dataSize_t] = CHOICE;
+
+                    dataSize_t++;
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+    
+    int getDataSize()
+    {
+        return dataSize_t;
+    }
+};
+
+class Simulation {
+public:
+    Map* map;
+    Player* player;
+    NeuralNet* neuralNet;
+private:
+    unsigned int* tabVar;
+
+public:
+    Simulation()
+    {
+        
+        map = new Map();
+        
+        player = new Player(map);
+
+        tabVar = new unsigned int[3];
+        tabVar[0] = 20;
+        tabVar[1] = 10;
+        tabVar[2] = 10;
+
+        neuralNet = new NeuralNet(9 * 9 * 2 + 2, 3, tabVar, 5);
+    }
+    void playManualy()
+    {
+        char choice;
+        bool ifTrue = true;
+        while (ifTrue)
+        {
+            map->view();
+            player->viewStats();
+            player->viewFoW();
+
+            choice = _getch();
+
+            switch (choice)
+            {
+            case'w':
+                player->moveUp();
+                player->saveChoice(1);
+                break;
+            case's':
+                player->moveDown();
+                player->saveChoice(2);
+                break;
+            case'a':
+                player->moveLeft();
+                player->saveChoice(3);
+                break;
+            case'd':
+                player->moveRight();
+                player->saveChoice(4);
+                break;
+            case' ':
+                player->consume();
+                player->saveChoice(5);
+                break;
+            default:
+                ifTrue = false;
+                break;
+
+            }
+        }
+    }
+    long double TrainNetwork()
+    {
+
+        long double error=0;
+
+        long double* input;
+        long double* output;
+        input = new long double[9 * 9 * 2 + 2];
+
+
+        output = new long double[5];
+
+        for (int example = 0; example <player->getDataSize(); example++)
+        {
+            for (int x = 0; x < 9; x++)
+            {
+                for (int y = 0; y < 9; y++)
+                {
+                    if (player->FoWData[example][x][y] == 'W')
+                    {
+                        input[x * 9 + y] = 1;
+                    }
+                    else
+                    {
+                        input[x * 9 + y] = 0;
+                    }
+
+                    if (player->FoWData[example][x][y] == 'F')
+                        input[81 + x * 9 + y] = 1;
+                    else
+                        input[81 + x * 9 + y] = 0;
+                }
+            }
+
+            input[81 * 2] = player->waterData[example] / 100;
+            input[81 * 2 + 1] = player->hungerData[example] / 100;
+
+            for (int i = 0; i < 5; i++)
+            {
+                if (i == (player->choice[example] - 1))
+                    output[i] = 1;
+                else
+                    output[i] = 0;
+            }
+            neuralNet->learnByExample(input, output);
+            error += neuralNet->costFunctionError(input,output);
+        }
+        error = error / player->getDataSize();
+
+        delete[] input;
+        delete[] output;
+
+        return error;
+    }
+    //void saveRun();
+    //void playSimulation();
+    //void startLearing();
+
+
+};
+
+class Main
+{
+public:
+    Main()
+    {
+
+    }
+    void symulation()
+    {
+        Simulation simulation;
+        char choice='1';
+        bool ifTrue=true;
+        while (ifTrue)
+        {   
+            simulation.neuralNet->size();
+            std::cout << "Co chcesz zrobić" << std::endl;
+            std::cout << "1.Zagraj w gre i zwieksz ilosc probek" << std::endl;
+            std::cout << "2.Trunuj siec na obencych probkach" << std::endl;
+            std::cout << "Else.Wyjdz" << std::endl;
+
+            choice = _getch();
+
+            if (choice == '1')
+            {
+                system("cls");
+                simulation.playManualy();
+
+            }
+            else if (choice == '2')
+            {
+                std::cout<<std::endl<<"Training Error: "<< simulation.TrainNetwork();
+                _getch();
+
+            }
+            else
+            {
+                ifTrue = false;
+            }
+            system("cls");
+        }
+    }
+    void testFuncitons()
+    {
+        Function* funkcje[3];
+        funkcje[0] = new Sigmoid;
+        funkcje[1] = new Function;
+        funkcje[2] = new LReLU;
+        for (int i = 0; i < 3; i++)
+        {
+            std::cout << "Funkcja nr: " << i + 1 << std::endl;
+            std::cout<<"F(-1): " << (*funkcje[i]).calculate(-1) << std::endl;
+            std::cout << "F'(-1): " << (*funkcje[i]).calculateDerevative(-1) << std::endl;
+            std::cout << "F(1): " << (*funkcje[i]).calculate(1) << std::endl;
+            std::cout << "F'(1): " << (*funkcje[i]).calculateDerevative(1) << std::endl;
+            std::cout << "F(7): " << (*funkcje[i]).calculate(7) << std::endl;
+            std::cout << "F'(7) :" << (*funkcje[i]).calculateDerevative(7) << std::endl << std::endl;
+        }
+    }
+    void testNeural_9_3_5_4_3_2()
+    {
+        unsigned int* hiddenLayersSizes_t=new unsigned int[3];
+        hiddenLayersSizes_t[0] = 5;
+        hiddenLayersSizes_t[1] = 4;
+        hiddenLayersSizes_t[2] = 3;
+        NeuralNet neuralNet(9,3, hiddenLayersSizes_t,2);
+
+        long double* input = new long double[9];
+        long double* output = new long double[2];
+        for (int i = 0; i < 9; i++)
+            input[i] = 0;
+        for (int i = 3; i < 6; i++)
+            input[i] = 1;
+
+        output[0] = 1;
+        output[1] = 0;
+
+        int iterator = 0;
+        neuralNet.viewCostFunctionError(input, output);
+        while (true)
+        {
+            neuralNet.learnByExample(input, output);
+            //if (iterator == 10)
+           // {
+                neuralNet.viewCostFunctionError(input, output);
+                iterator = 0;
+            //}
+           // iterator++;
+    }
+
+    }
+    void testNeural_83_3_10_5_andViewIterations()
+    {
+        unsigned int* hiddenLayersSizes_t = new unsigned int[3];
+        hiddenLayersSizes_t[0] = 10;
+        hiddenLayersSizes_t[1] = 10;
+        hiddenLayersSizes_t[2] = 10;
+        NeuralNet neuralNet(83, 3, hiddenLayersSizes_t, 5);
+
+        long double* input = new long double[83];
+        long double* output = new long double[5];
+        for (int i = 0; i < 83; i++)
+            input[i] = 0;
+        for (int i = 3; i < 6; i++)
+            input[i] = 1;
+
+        output[0] = 1;
+        output[1] = 0;
+        output[2] = 0;
+        output[3] = 0;
+        output[4] = 0;
+
+        int iterator = 0;
+        neuralNet.viewCostFunctionError(input, output);
+        while (neuralNet.costFunctionError(input, output) > 0.005)
+        {
+            neuralNet.learnByExample(input, output);
+            if (iterator % 10 == 0 && false)
+            {
+                neuralNet.viewCostFunctionError(input, output);
+            }
+            iterator++;
+        }
+        neuralNet.viewCostFunctionError(input, output);
+        std::cout << std::endl << "Iterations:" << iterator << std::endl;
+
+    }
+    void testNeural_83_3_1_5_andViewIterations()
+    {
+        unsigned int* hiddenLayersSizes_t = new unsigned int[3];
+        hiddenLayersSizes_t[0] = 1;
+        hiddenLayersSizes_t[1] = 1;
+        hiddenLayersSizes_t[2] = 1;
+        NeuralNet neuralNet(3, 3, hiddenLayersSizes_t, 5);
+
+        long double* input = new long double[83];
+        long double* output = new long double[5];
+        for (int i = 0; i < 83; i++)
+            input[i] = 0;
+        for (int i = 3; i < 6; i++)
+            input[i] = 1;
+
+        output[0] = 1;
+        output[1] = 0;
+        output[2] = 0;
+        output[3] = 0;
+        output[4] = 0;
+
+        int iterator = 0;
+        neuralNet.viewCostFunctionError(input, output);
+        while (neuralNet.costFunctionError(input, output) > 0.005)
+        {
+            neuralNet.learnByExample(input, output);
+            if (iterator % 10 == 0 && false)
+            {
+                neuralNet.viewCostFunctionError(input, output);
+            }
+            iterator++;
+        }
+        neuralNet.viewCostFunctionError(input, output);
+        std::cout << std::endl << "Iterations:" << iterator << std::endl;
+
+    }
+};
+int main()
+{
+    /*unsigned int var3[] = { 1 };
+        long double error = 0;
+        NeuralNet* neuralNet = new NeuralNet(9*9*2+2,1,var3,5);
+
+        long double* input;
+        long double* output;
+        input = new long double[9 * 9 * 2 + 2];
+
+        output = new long double[5];
+
+        for (int example = 0; example < 10; example++)
+        {
+            for (int x = 0; x < 9; x++)
+            {
+                for (int y = 0; y < 9; y++)
+                {
+                    if (false)
+                    {
+                        input[x * 9 + y] = 1;
+                    }
+                    else
+                    {
+                        input[x * 9 + y] = 0;
+                    }
+
+                    if (false)
+                        input[81 + x * 9 + y] = 1;
+                    else
+                        input[81 + x * 9 + y] = 0;
+                }
+            }
+
+            input[81 * 2] = 90 / 100;
+            input[81 * 2 + 1] = 90 / 100;
+
+            for (int i = 0; i < 5; i++)
+            {
+                if (true)
+                    output[i] = 1;
+                else
+                    output[i] = 0;
+            }
+
+            neuralNet->viewCostFunctionError(input, output);
+            neuralNet->learnByExample(input, output);
+            error += neuralNet->costFunctionError(input, output);
+        }
+        error = error / 10;
+
+        delete[] input;
+        delete[] output;*/
+    
+    Main MAIN;
+   // MAIN.testNeural_83_3_1_5_andViewIterations();
+    MAIN.symulation();
+    //MAIN.testNeural_83_3_10_5_andViewIterations();
+   
+    return 0;
+}
+// Uruchomienie programu: Ctrl + F5 lub menu Debugowanie > Uruchom bez debugowania
+// Debugowanie programu: F5 lub menu Debugowanie > Rozpocznij debugowanie
+
+// Porady dotyczące rozpoczynania pracy:
+//   1. Użyj okna Eksploratora rozwiązań, aby dodać pliki i zarządzać nimi
+//   2. Użyj okna programu Team Explorer, aby nawiązać połączenie z kontrolą źródła
+//   3. Użyj okna Dane wyjściowe, aby sprawdzić dane wyjściowe kompilacji i inne komunikaty
+//   4. Użyj okna Lista błędów, aby zobaczyć błędy
+//   5. Wybierz pozycję Projekt > Dodaj nowy element, aby utworzyć nowe pliki kodu, lub wybierz pozycję Projekt > Dodaj istniejący element, aby dodać istniejące pliku kodu do projektu
+//   6. Aby w przyszłości ponownie otworzyć ten projekt, przejdź do pozycji Plik > Otwórz > Projekt i wybierz plik sln
